@@ -70,3 +70,130 @@ def movies_per_decade() -> None:
         return
     print("\nDistribution par décennie")
     print(tabulate(rows, headers=["Décennie", "Nombre de films"], tablefmt="grid"))
+
+
+# =========================
+# STATISTIQUES AVANCÉES
+# =========================
+
+
+def avg_rating_by_year() -> None:
+
+    es = get_client()
+    result = es.search(
+        index=INDEX_NAME,
+        size=0,
+        aggs={
+            "by_year": {
+                "terms": {
+                    "field": "year",
+                    "size": 1000,
+                    "order": {"_key": "asc"}
+                },
+                "aggs": {
+                    "avg_rating": {"avg": {"field": "rating"}}
+                },
+            }
+        },
+    )
+
+    buckets = result["aggregations"]["by_year"]["buckets"]
+    rows = [
+        [b["key"], round(b["avg_rating"]["value"], 2) if b["avg_rating"]["value"] else None]
+        for b in buckets
+    ]
+
+    if not rows:
+        print("Aucune donnée disponible par année.")
+        return
+
+    print("\nMoyenne des notes par année")
+    print(tabulate(rows, headers=["Année", "Note moyenne"], tablefmt="grid"))
+
+
+def genres_best_avg_rating(size: int = 10) -> None:
+    es = get_client()
+    result = es.search(
+        index=INDEX_NAME,
+        size=0,
+        aggs={
+            "genres": {
+                "terms": {
+                    "field": "genres",
+                    "size": size
+                },
+                "aggs": {
+                    "avg_rating": {"avg": {"field": "rating"}}
+                },
+            }
+        },
+    )
+
+    buckets = result["aggregations"]["genres"]["buckets"]
+
+    rows = sorted(
+        [
+            [b["key"], round(b["avg_rating"]["value"], 2) if b["avg_rating"]["value"] else 0]
+            for b in buckets
+        ],
+        key=lambda x: x[1],
+        reverse=True,
+    )
+
+    if not rows:
+        print("Aucune donnée pour les genres.")
+        return
+
+    print(f"\nGenres classés par note moyenne (Top {size})")
+    print(tabulate(rows, headers=["Genre", "Note moyenne"], tablefmt="grid"))
+
+
+def ratings_by_director(min_movies: int = 1, size: int = 10) -> None:
+    es = get_client()
+
+    result = es.search(
+        index=INDEX_NAME,
+        size=0,
+        query={
+            "exists": {"field": "rating"}  # 🔥 filtre essentiel
+        },
+        aggs={
+            "directors": {
+                "terms": {
+                    "field": "directors.keyword",  # 🔥 important pour agrégation
+                    "size": 1000
+                },
+                "aggs": {
+                    "avg_rating": {
+                        "avg": {"field": "rating"}
+                    },
+                    "movie_count": {
+                        "value_count": {"field": "title.keyword"}
+                    }
+                }
+            }
+        }
+    )
+
+    buckets = result["aggregations"]["directors"]["buckets"]
+
+    # filtrer les réalisateurs avec assez de films
+    filtered = [
+        [
+            b["key"],
+            b["movie_count"]["value"],
+            round(b["avg_rating"]["value"], 2) if b["avg_rating"]["value"] else 0
+        ]
+        for b in buckets
+        if b["movie_count"]["value"] >= min_movies
+    ]
+
+    #  tri par note moyenne
+    rows = sorted(filtered, key=lambda x: x[2], reverse=True)[:size]
+
+    if not rows:
+        print("Aucun réalisateur avec assez de films.")
+        return
+
+    print(f"\nNotes moyennes par réalisateur (min {min_movies} films)")
+    print(tabulate(rows, headers=["Réalisateur", "Nb films", "Note moyenne"], tablefmt="grid"))

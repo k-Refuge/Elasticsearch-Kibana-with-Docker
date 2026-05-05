@@ -1,9 +1,10 @@
 # src/main.py
-from analytics import global_stats, movies_per_decade, top_actors, top_directors, top_genres
+from analytics import global_stats, movies_per_decade, top_actors, top_directors, top_genres, avg_rating_by_year, genres_best_avg_rating, ratings_by_director
+
+
 from config import DATA_FILE
 from indexer import index_data
 from search import search_advanced, search_by_title, search_fuzzy, search_plot, suggest_titles
-
 
 def _to_float(value: str):
     return float(value) if value.strip() else None
@@ -28,6 +29,7 @@ def run_cli() -> None:
         print("║  7. Statistiques globales                ║")
         print("║  8. Top genres/réalisateurs/acteurs      ║")
         print("║  9. Répartition par décennie             ║")
+        print("║  10. Statistiques avancées               ║")
         print("║  0. Quitter                              ║")
         print("╚══════════════════════════════════════════╝")
 
@@ -67,6 +69,10 @@ def run_cli() -> None:
                 top_actors()
             elif choice == "9":
                 movies_per_decade()
+            elif choice == "10":
+                genres_best_avg_rating()
+                avg_rating_by_year()
+                ratings_by_director()
             elif choice == "0":
                 print("Fermeture de CinéSearch. À bientôt.")
                 break
